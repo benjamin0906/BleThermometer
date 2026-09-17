@@ -26,7 +26,7 @@
 static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param);
 
 static const char *DEMO_TAG = "BLE_BEACON";
-static const char device_name[] = "Bluedroid_Beacon";
+static const char device_name[] = "BleThermometer";
 
 static uint8_t adv_config_done = 0;
 static esp_bd_addr_t local_addr;
