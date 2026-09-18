@@ -63,6 +63,7 @@ static uint8_t AppendData(esp_ble_adv_data_type ad_id, uint8_t *data, uint8_t le
 static uint8_t ClearDataField(esp_ble_adv_data_type ap_id, uint8_t *buffer)
 {
     uint8_t i = 0;
+    uint8_t ret = 0;
     if(buffer != NULL)
     {
         while((i < 30) && (buffer[i] != 0) && (buffer[i+1] != ap_id) && (buffer[i+1] != 0))
@@ -75,11 +76,12 @@ static uint8_t ClearDataField(esp_ble_adv_data_type ap_id, uint8_t *buffer)
         //printf("i: %i, left: %i\n", i, 31 - i - buffer[i] -1);
         if((buffer[i+1] == ap_id))
         {
+            ret = 1;
             memmove(&buffer[i], &buffer[i+buffer[i]+1], 31 - i - buffer[i] -1);
         }
         memset(&buffer[i + buffer[i]], 0, 31 - (i + buffer[i]));
     }
-    return i;
+    return ret;
 }
 
 static void printBuff(uint8_t *buffer)
@@ -183,9 +185,13 @@ void BLE_SendAdvertise(void)
 
 void BLE_AddServiceData(uint8_t *data, uint8_t length)
 {
-    ClearDataField(ESP_BLE_AD_TYPE_SERVICE_DATA, adv_raw_data);
     AppendData(ESP_BLE_AD_TYPE_SERVICE_DATA, data, length, adv_raw_data);
     printBuff(adv_raw_data);
+}
+
+void BLE_RemoveServiceData(void)
+{
+    while(ClearDataField(ESP_BLE_AD_TYPE_SERVICE_DATA, adv_raw_data) != 0);
 }
 
 static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param)
