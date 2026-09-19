@@ -5,12 +5,14 @@
 #include "esp_bt_main.h"
 #include "esp_log.h"
 
-#define ADV_CONFIG_FLAG      (1 << 0)
-#define SCAN_RSP_CONFIG_FLAG (1 << 1)
+#define ADV_CONF_SET_FLAG   (1)
+#define ADV_CONFIG_FLAG     (2)
+#define ADV_STARTED_FLAG    (4)
+#define ADV_FAILED_FLAG     (8)
 
 static const char *TAG = "BLE";
 static const char device_name[] = "BleThermometer";
-static uint8_t adv_config_done = 0;
+static uint8_t adv_config_flags = 0;
 
 static esp_ble_adv_params_t adv_params = {
     .adv_int_min = 0x20,  // 20ms
@@ -152,7 +154,7 @@ void BLE_Init(void)
         return;
     }
 
-    adv_config_done |= ADV_CONFIG_FLAG;
+    adv_config_flags |= ADV_CONF_SET_FLAG;
     
     ret = esp_ble_gap_config_adv_data_raw(adv_raw_data, sizeof(adv_raw_data));
     if (ret) {
@@ -178,8 +180,9 @@ void BLE_Init(void)
     }
 }
 
-void BLE_SendAdvertise(void)
+void BLE_StartAdvertise(void)
 {
+    adv_config_flags = ADV_CONF_SET_FLAG;
     esp_ble_gap_config_adv_data_raw(adv_raw_data, sizeof(adv_raw_data));
 }
 
@@ -194,43 +197,72 @@ void BLE_RemoveServiceData(void)
     while(ClearDataField(ESP_BLE_AD_TYPE_SERVICE_DATA, adv_raw_data) != 0);
 }
 
+void BLE_StopAdverting(void)
+{
+    esp_ble_gap_stop_advertising();
+}
+
+uint8_t BLE_AdvStatus(void)
+{
+    uint8_t ret = 0;
+    switch(adv_config_flags)
+    {
+        case ADV_STARTED_FLAG:
+            ret = 1;
+            break;
+        case ADV_FAILED_FLAG:
+            ret = -1;
+            break;
+    }
+
+    return ret;
+}
+
 static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param)
 {
+    ESP_LOGI(TAG, "GAP event: %i", event);
     switch (event) {
     case ESP_GAP_BLE_ADV_DATA_SET_COMPLETE_EVT:
         ESP_LOGI(TAG, "Advertising data set, status %d", param->adv_data_cmpl.status);
-        adv_config_done &= (~ADV_CONFIG_FLAG);
-        if (adv_config_done == 0) {
+        if (adv_config_flags == ADV_CONF_SET_FLAG)
+        {
+            adv_config_flags = ADV_CONFIG_FLAG;
             esp_ble_gap_start_advertising(&adv_params);
         }
         break;
     case ESP_GAP_BLE_ADV_DATA_RAW_SET_COMPLETE_EVT:
         ESP_LOGI(TAG, "Advertising data raw set, status %d", param->adv_data_raw_cmpl.status);
-        adv_config_done &= (~ADV_CONFIG_FLAG);
-        if (adv_config_done == 0) {
+        if (adv_config_flags == ADV_CONF_SET_FLAG)
+        {
+            adv_config_flags = ADV_CONFIG_FLAG;
             esp_ble_gap_start_advertising(&adv_params);
         }
         break;
     case ESP_GAP_BLE_SCAN_RSP_DATA_SET_COMPLETE_EVT:
         ESP_LOGI(TAG, "Scan response data set, status %d", param->scan_rsp_data_cmpl.status);
-        adv_config_done &= (~SCAN_RSP_CONFIG_FLAG);
+        /*adv_config_done &= (~SCAN_RSP_CONFIG_FLAG);
         if (adv_config_done == 0) {
             esp_ble_gap_start_advertising(&adv_params);
-        }
+        }*/
         break;
     case ESP_GAP_BLE_SCAN_RSP_DATA_RAW_SET_COMPLETE_EVT:
         ESP_LOGI(TAG, "Scan response data raw set, status %d", param->scan_rsp_data_raw_cmpl.status);
-        adv_config_done &= (~SCAN_RSP_CONFIG_FLAG);
+        /*adv_config_done &= (~SCAN_RSP_CONFIG_FLAG);
         if (adv_config_done == 0) {
             esp_ble_gap_start_advertising(&adv_params);
-        }
+        }*/
         break;
     case ESP_GAP_BLE_ADV_START_COMPLETE_EVT:
         if (param->adv_start_cmpl.status != ESP_BT_STATUS_SUCCESS) {
             ESP_LOGE(TAG, "Advertising start failed, status %d", param->adv_start_cmpl.status);
+            adv_config_flags = ADV_FAILED_FLAG;
             break;
         }
+        adv_config_flags = ADV_STARTED_FLAG;
         ESP_LOGI(TAG, "Advertising start successfully");
+        break;
+    case ESP_GAP_BLE_ADV_STOP_COMPLETE_EVT:
+        adv_config_flags = 0;
         break;
     case ESP_GAP_BLE_GET_DEV_NAME_COMPLETE_EVT:
         ESP_LOGI(TAG, "ESP_GAP_BLE_GET_DEV_NAME_COMPLETE_EVT has come");

@@ -5,7 +5,7 @@
 static const uint8_t SHT41_Cmd_HighWoHeat = 0xFD;
 //static const uint8_t SHT41_Cmd_MediWoHeat = 0xF6;
 //static const uint8_t SHT41_Cmd_LowWoHeat  = 0xE0;
-static const uint16_t DelayTickValue = 10 / portTICK_PERIOD_MS;
+static const uint16_t DelayTickValue = 20 / portTICK_PERIOD_MS;
 
 static int16_t TemperatureX100;
 static uint16_t HumidityX100;
@@ -25,6 +25,7 @@ esp_err_t SHT41_Measure(int16_t *const Temperature, uint16_t *const Humidity)
     transaction1.writing = 0;
     transaction1.register_length = 0;
     transaction1.length = 6;
+
     vTaskDelay(DelayTickValue);
 
     if(I2C_Wrapper_Transmit(&transaction1) != ESP_OK)

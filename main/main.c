@@ -12,6 +12,7 @@
 #include "esp_log.h"
 #include "esp_system.h"
 #include "esp_bt_defs.h"
+#include "esp_sleep.h"
 #include "freertos/FreeRTOS.h"
 #include "ble.h"
 #include "i2c_wrapper.h"
@@ -36,19 +37,14 @@ static uint8_t BTH_Temp(uint8_t *buffer, int16_t temperature, uint16_t humidity)
     return i;
 }
 
-static uint32_t counter;
-
 void app_main(void)
 {
     esp_err_t ret;
-    uint16_t tt = 2506;
-    uint8_t asd[16] = { 0xD2, 0xFC, 0x40, 0x3E, 0x01, 0x02, 0x03, 0x04};
-    uint8_t length = 0;
-    uint8_t serial[6];
-    dtI2c_wrapper_transaction transaction1 = {.register_address = 0xFD, .writing = 1, .data = 0, .length = 0};
-    dtI2c_wrapper_transaction transaction2 = {.register_address = 0xFD, .writing = 0, .data = serial, .length = 6};
+    uint8_t service_payload[16] = { 0xD2, 0xFC, 0x40, 0x3E, 0x01, 0x02, 0x03, 0x04};
+    uint8_t serv_payload_len = 0;
     int16_t TemperatureX100;
     uint16_t HumidityX100;
+    uint16_t counter = 0;
 
     //initialize NVS
     ret = nvs_flash_init();
@@ -58,38 +54,42 @@ void app_main(void)
     }
     ESP_ERROR_CHECK(ret);
 
+    //RTC_SLOW_CLOCK;
+
+    esp_sleep_enable_timer_wakeup(20000000);
+
     BLE_Init();
     I2C_Wrapper_Init();
     I2C_Wrapper_SetDevice(0x44, 100000);
 
-
-    printf("Cycle starts\n");
-
     while(1)
     {
-        /*if(ret == 0)
-        {
-            ret = I2C_Wrapper_Transmit(&transaction1);
-            printf("i2c ret: %i\n", ret);
-        }
-        
-        while(I2C_Wrapper_Transmit(&transaction2) != 0);
-        printf("i2c ret: %i\n", ret);
-
-        printf("response: %x %x %x %x %x %x\n", serial[0], serial[1], serial[2], serial[3], serial[4], serial[5]);*/
-
         SHT41_Measure(&TemperatureX100, &HumidityX100);
         printf("Temp: %i, Hum: %i\n", TemperatureX100, HumidityX100);
 
-        counter++;
-        tt++;
-
-        length = BTH_Temp(asd, TemperatureX100, HumidityX100);
+        serv_payload_len = BTH_Temp(service_payload, TemperatureX100, HumidityX100);
         BLE_RemoveServiceData();
-        BLE_AddServiceData(asd, length);
+        BLE_AddServiceData(service_payload, serv_payload_len);
 
-        BLE_SendAdvertise();
+        BLE_StartAdvertise();
+        while(BLE_AdvStatus() == 0);
+        printf("Adv result1: %i\n", BLE_AdvStatus());
 
-        vTaskDelay(2000 / portTICK_PERIOD_MS);
+        vTaskDelay(500 / portTICK_PERIOD_MS);
+
+        BLE_StopAdverting();
+        while(BLE_AdvStatus() != 0);
+        printf("Adv result2: %i\n", BLE_AdvStatus());
+        
+        fflush(stdout);
+        if(counter < 2)
+        {
+            vTaskDelay(10000 / portTICK_PERIOD_MS);
+            counter++;
+        }
+        else
+        {
+            esp_light_sleep_start();
+        }
     }
 }
