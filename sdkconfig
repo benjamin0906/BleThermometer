@@ -2990,7 +2990,6 @@ CONFIG_SPI_FLASH_ENABLE_ENCRYPTED_READ_WRITE=y
 #
 # Virtual file system
 #
-# default:
 CONFIG_VFS_SUPPORT_IO=y
 # default:
 CONFIG_VFS_SUPPORT_DIR=y
