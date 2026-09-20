@@ -56,7 +56,7 @@ void app_main(void)
 
     //RTC_SLOW_CLOCK;
 
-    esp_sleep_enable_timer_wakeup(20000000);
+    esp_sleep_enable_timer_wakeup(120000000);
 
     BLE_Init();
     I2C_Wrapper_Init();
@@ -80,7 +80,7 @@ void app_main(void)
         BLE_StopAdverting();
         while(BLE_AdvStatus() != 0);
         printf("Adv result2: %i\n", BLE_AdvStatus());
-        
+
         fflush(stdout);
         if(counter < 2)
         {
