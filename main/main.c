@@ -17,6 +17,7 @@
 #include "ble.h"
 #include "i2c_wrapper.h"
 #include "sth41.h"
+#include "driver/gpio.h"
 
 static uint8_t BTH_Temp(uint8_t *buffer, int16_t temperature, uint16_t humidity)
 {
@@ -39,6 +40,14 @@ static uint8_t BTH_Temp(uint8_t *buffer, int16_t temperature, uint16_t humidity)
 
 void app_main(void)
 {
+    /*gpio_config_t debug_pin = {
+        .intr_type = GPIO_INTR_DISABLE, 
+        .mode = GPIO_MODE_OUTPUT,
+        .pin_bit_mask = (1ULL << GPIO_NUM_21),
+        .pull_up_en = GPIO_PULLUP_DISABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE};
+    gpio_config(&debug_pin);
+    gpio_set_level(GPIO_NUM_21, 1); //debug purpose*/
     esp_err_t ret;
     uint8_t service_payload[16] = { 0xD2, 0xFC, 0x40, 0x3E, 0x01, 0x02, 0x03, 0x04};
     uint8_t serv_payload_len = 0;
@@ -57,7 +66,8 @@ void app_main(void)
     //RTC_SLOW_CLOCK;
 
     esp_sleep_enable_timer_wakeup(120000000);
-
+    //esp_sleep_enable_timer_wakeup(20000000);
+    
     BLE_Init();
     I2C_Wrapper_Init();
     I2C_Wrapper_SetDevice(0x44, 100000);
@@ -81,15 +91,7 @@ void app_main(void)
         while(BLE_AdvStatus() != 0);
         printf("Adv result2: %i\n", BLE_AdvStatus());
 
-        fflush(stdout);
-        if(counter < 2)
-        {
-            vTaskDelay(10000 / portTICK_PERIOD_MS);
-            counter++;
-        }
-        else
-        {
-            esp_light_sleep_start();
-        }
+        //gpio_set_level(GPIO_NUM_21, 0); //debug purpose
+        esp_deep_sleep_start();
     }
 }
