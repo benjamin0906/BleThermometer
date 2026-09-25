@@ -19,6 +19,7 @@
 #include "sth41.h"
 #include "driver/gpio.h"
 #include "adc.h"
+#include "esp_timer.h"
 
 static uint8_t BTH_Temp(uint8_t *buffer, int16_t temperature, uint16_t humidity)
 {
@@ -74,23 +75,20 @@ void app_main(void)
     BLE_Init();
     I2C_Wrapper_Init();
     I2C_Wrapper_SetDevice(0x44, 100000);
-    adc_cont_start();
+
+    uint64_t timestamp = 0;
+    uint16_t sample = 0;
 
     while(1)
     {
         SHT41_Measure(&TemperatureX100, &HumidityX100);
         //printf("Temp: %i, Hum: %i\n", TemperatureX100, HumidityX100);
 
-        do
-        {
-            adc_result_num = adc_get_raw(ADC_CHANNEL_0, adc_result, 4);
-            printf("result: %i\n", adc_result_num);
-            if(0 < adc_result_num)
-            {
-                printf("results: %i, %i, %i, %i \n", adc_result[0], adc_result[1], adc_result[2], adc_result[3]);
-            }
-        } while (adc_result_num != 0);
         
+        timestamp = esp_timer_get_time();
+        sample = adc_get_raw(ADC_CHANNEL_0);
+        timestamp = esp_timer_get_time() - timestamp;
+        printf("Td: %llu, result: %i\n", timestamp, sample);
         
 
         serv_payload_len = BTH_Temp(service_payload, TemperatureX100, HumidityX100);
