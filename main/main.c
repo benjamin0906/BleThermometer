@@ -18,6 +18,7 @@
 #include "i2c_wrapper.h"
 #include "sth41.h"
 #include "driver/gpio.h"
+#include "adc.h"
 
 static uint8_t BTH_Temp(uint8_t *buffer, int16_t temperature, uint16_t humidity)
 {
@@ -53,7 +54,8 @@ void app_main(void)
     uint8_t serv_payload_len = 0;
     int16_t TemperatureX100;
     uint16_t HumidityX100;
-    uint16_t counter = 0;
+    uint16_t adc_result_num = 0;
+    uint16_t adc_result[4];
 
     //initialize NVS
     ret = nvs_flash_init();
@@ -67,15 +69,29 @@ void app_main(void)
 
     esp_sleep_enable_timer_wakeup(120000000);
     //esp_sleep_enable_timer_wakeup(20000000);
-    
+
+    adc_init();
     BLE_Init();
     I2C_Wrapper_Init();
     I2C_Wrapper_SetDevice(0x44, 100000);
+    adc_cont_start();
 
     while(1)
     {
         SHT41_Measure(&TemperatureX100, &HumidityX100);
-        printf("Temp: %i, Hum: %i\n", TemperatureX100, HumidityX100);
+        //printf("Temp: %i, Hum: %i\n", TemperatureX100, HumidityX100);
+
+        do
+        {
+            adc_result_num = adc_get_raw(ADC_CHANNEL_0, adc_result, 4);
+            printf("result: %i\n", adc_result_num);
+            if(0 < adc_result_num)
+            {
+                printf("results: %i, %i, %i, %i \n", adc_result[0], adc_result[1], adc_result[2], adc_result[3]);
+            }
+        } while (adc_result_num != 0);
+        
+        
 
         serv_payload_len = BTH_Temp(service_payload, TemperatureX100, HumidityX100);
         BLE_RemoveServiceData();
@@ -83,15 +99,16 @@ void app_main(void)
 
         BLE_StartAdvertise();
         while(BLE_AdvStatus() == 0);
-        printf("Adv result1: %i\n", BLE_AdvStatus());
+        //printf("Adv result1: %i\n", BLE_AdvStatus());
 
         vTaskDelay(500 / portTICK_PERIOD_MS);
 
         BLE_StopAdverting();
         while(BLE_AdvStatus() != 0);
-        printf("Adv result2: %i\n", BLE_AdvStatus());
+        //printf("Adv result2: %i\n", BLE_AdvStatus());
 
         //gpio_set_level(GPIO_NUM_21, 0); //debug purpose
-        esp_deep_sleep_start();
+        //esp_deep_sleep_start();
+        vTaskDelay(5000 / portTICK_PERIOD_MS);
     }
 }
