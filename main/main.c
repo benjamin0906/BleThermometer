@@ -21,23 +21,54 @@
 #include "adc.h"
 #include "esp_timer.h"
 
-static uint8_t BTH_Temp(uint8_t *buffer, int16_t temperature, uint16_t humidity)
+static const uint16_t adc_scalefactor_nom = 1000;
+static const uint16_t adc_scalefactor_denom = 641;
+
+static uint8_t BTH_Temp(uint8_t *buffer, int16_t temperature, uint16_t humidity, uint8_t battery)
 {
     /* Temperature dimension: 0.01 ˚C */
     uint8_t i = 0;
     buffer[i++] = 0xD2;
     buffer[i++] = 0xFC;
     buffer[i++] = 0x40;
-    buffer[i++] = 0x02;
 
+    buffer[i++] = 0x01;
+    buffer[i++] = battery;
+
+    buffer[i++] = 0x02;
     buffer[i++] = ((uint8_t*)&temperature)[0];
     buffer[i++] = ((uint8_t*)&temperature)[1];
 
     buffer[i++] = 0x03;
-
     buffer[i++] = ((uint8_t*)&humidity)[0];
     buffer[i++] = ((uint8_t*)&humidity)[1];
+
+
     return i;
+}
+
+static uint8_t SocCalculation(uint16_t Voltage)
+{
+    const uint16_t SoC_Volt_map[] = {3200, 3600, 3700, 3750, 3790, 3830, 3870, 3920, 4000, 4100, 4200};
+    uint8_t SoC = 0;
+    uint8_t i = 0;
+    uint8_t lower = 0;
+    uint8_t higher = 0;
+    while((i < (sizeof(SoC_Volt_map)/sizeof(SoC_Volt_map[0]))) && (Voltage > SoC_Volt_map[i])) i++;
+    printf("Voltage: %i, i: %i \n", Voltage, i);
+    if((i > 1) && (i < (sizeof(SoC_Volt_map)/sizeof(SoC_Volt_map[0]))))
+    {
+        lower = (i - 1) * 10;
+        higher = i * 10;
+        SoC = (((uint16_t)(higher - lower) * (Voltage - SoC_Volt_map[i-1])) / (SoC_Volt_map[i] - SoC_Volt_map[i-1])) + lower;
+    }
+    else if(i > 1)
+    {
+        SoC = 101;
+    }
+    
+
+    return SoC;
 }
 
 void app_main(void)
@@ -55,8 +86,6 @@ void app_main(void)
     uint8_t serv_payload_len = 0;
     int16_t TemperatureX100;
     uint16_t HumidityX100;
-    uint16_t adc_result_num = 0;
-    uint16_t adc_result[4];
 
     //initialize NVS
     ret = nvs_flash_init();
@@ -68,30 +97,25 @@ void app_main(void)
 
     //RTC_SLOW_CLOCK;
 
-    esp_sleep_enable_timer_wakeup(120000000);
-    //esp_sleep_enable_timer_wakeup(20000000);
+    esp_sleep_enable_timer_wakeup(180000000);
 
     adc_init();
+    adc_ConfigConversion(ADC_CHANNEL_0);
     BLE_Init();
     I2C_Wrapper_Init();
     I2C_Wrapper_SetDevice(0x44, 100000);
 
-    uint64_t timestamp = 0;
-    uint16_t sample = 0;
+    uint16_t sampleV = 0;
 
     while(1)
     {
+        adc_TriggerOneshot();
         SHT41_Measure(&TemperatureX100, &HumidityX100);
-        //printf("Temp: %i, Hum: %i\n", TemperatureX100, HumidityX100);
-
         
-        timestamp = esp_timer_get_time();
-        sample = adc_get_raw(ADC_CHANNEL_0);
-        timestamp = esp_timer_get_time() - timestamp;
-        printf("Td: %llu, result: %i\n", timestamp, sample);
-        
+        while(adc_IsOneshotDone() == 0);
+        sampleV = adc_GetLastVoltage();
 
-        serv_payload_len = BTH_Temp(service_payload, TemperatureX100, HumidityX100);
+        serv_payload_len = BTH_Temp(service_payload, TemperatureX100, HumidityX100, SocCalculation(((uint32_t)sampleV * adc_scalefactor_nom) / adc_scalefactor_denom));
         BLE_RemoveServiceData();
         BLE_AddServiceData(service_payload, serv_payload_len);
 
@@ -106,7 +130,8 @@ void app_main(void)
         //printf("Adv result2: %i\n", BLE_AdvStatus());
 
         //gpio_set_level(GPIO_NUM_21, 0); //debug purpose
-        //esp_deep_sleep_start();
-        vTaskDelay(5000 / portTICK_PERIOD_MS);
+        esp_deep_sleep_start();
+        //esp_light_sleep_start();
+        //vTaskDelay(2000 / portTICK_PERIOD_MS);
     }
 }

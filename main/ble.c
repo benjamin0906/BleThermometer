@@ -25,11 +25,11 @@ static esp_ble_adv_params_t adv_params = {
 
 static uint8_t adv_raw_data[31] = {
     0x02, ESP_BLE_AD_TYPE_FLAG, 0x06,
-    0x04, ESP_BLE_AD_TYPE_NAME_CMPL, 'T', 's', 'T',
+    0x04, ESP_BLE_AD_TYPE_NAME_CMPL, 'T', 'H', '3',
     0x02, ESP_BLE_AD_TYPE_TX_PWR, 0x09,
     0x03, ESP_BLE_AD_TYPE_APPEARANCE, 0x00,0x02,
     0x02, ESP_BLE_AD_TYPE_LE_ROLE, 0x00,
-    0x09, ESP_BLE_AD_TYPE_SERVICE_DATA, 0xD2, 0xFC, 0x40, 0x3E, 0x01, 0x02, 0x03, 0x04,
+    //0x09, ESP_BLE_AD_TYPE_SERVICE_DATA, 0xD2, 0xFC, 0x40, 0x3E, 0x01, 0x02, 0x03, 0x04,
 };
 
 static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param);
