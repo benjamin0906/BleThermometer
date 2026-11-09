@@ -121,7 +121,6 @@ void app_main(void)
 
         BLE_StartAdvertise();
         while(BLE_AdvStatus() == 0);
-        //printf("Adv result1: %i\n", BLE_AdvStatus());
 
         vTaskDelay(500 / portTICK_PERIOD_MS);
 
