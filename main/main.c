@@ -21,6 +21,9 @@
 #include "adc.h"
 #include "esp_timer.h"
 
+#define DEBUG_PIN
+#define SLEEP_TIME (180000000)
+
 static const uint16_t adc_scalefactor_nom = 1000;
 static const uint16_t adc_scalefactor_denom = 641;
 
@@ -43,7 +46,6 @@ static uint8_t BTH_Temp(uint8_t *buffer, int16_t temperature, uint16_t humidity,
     buffer[i++] = ((uint8_t*)&humidity)[0];
     buffer[i++] = ((uint8_t*)&humidity)[1];
 
-
     return i;
 }
 
@@ -55,7 +57,7 @@ static uint8_t SocCalculation(uint16_t Voltage)
     uint8_t lower = 0;
     uint8_t higher = 0;
     while((i < (sizeof(SoC_Volt_map)/sizeof(SoC_Volt_map[0]))) && (Voltage > SoC_Volt_map[i])) i++;
-    printf("Voltage: %i, i: %i \n", Voltage, i);
+    //printf("Voltage: %i, i: %i \n", Voltage, i);
     if((i > 1) && (i < (sizeof(SoC_Volt_map)/sizeof(SoC_Volt_map[0]))))
     {
         lower = (i - 1) * 10;
@@ -66,14 +68,13 @@ static uint8_t SocCalculation(uint16_t Voltage)
     {
         SoC = 101;
     }
-    
-
     return SoC;
 }
 
 void app_main(void)
 {
-    /*gpio_config_t debug_pin = {
+#if defined(DEBUG_PIN)
+    gpio_config_t debug_pin = {
         .intr_type = GPIO_INTR_DISABLE, 
         .mode = GPIO_MODE_OUTPUT,
         .pin_bit_mask = (1ULL << GPIO_NUM_21),
@@ -81,6 +82,7 @@ void app_main(void)
         .pull_down_en = GPIO_PULLDOWN_DISABLE};
     gpio_config(&debug_pin);
     gpio_set_level(GPIO_NUM_21, 1); //debug purpose*/
+#endif
     esp_err_t ret;
     uint8_t service_payload[16] = { 0xD2, 0xFC, 0x40, 0x3E, 0x01, 0x02, 0x03, 0x04};
     uint8_t serv_payload_len = 0;
@@ -95,9 +97,7 @@ void app_main(void)
     }
     ESP_ERROR_CHECK(ret);
 
-    //RTC_SLOW_CLOCK;
-
-    esp_sleep_enable_timer_wakeup(180000000);
+    esp_sleep_enable_timer_wakeup(SLEEP_TIME);
 
     adc_init();
     adc_ConfigConversion(ADC_CHANNEL_0);
@@ -127,11 +127,11 @@ void app_main(void)
 
         BLE_StopAdverting();
         while(BLE_AdvStatus() != 0);
-        //printf("Adv result2: %i\n", BLE_AdvStatus());
 
-        //gpio_set_level(GPIO_NUM_21, 0); //debug purpose
+#if defined(DEBUG_PIN)
+        gpio_set_level(GPIO_NUM_21, 0);
+#endif
         esp_deep_sleep_start();
-        //esp_light_sleep_start();
         //vTaskDelay(2000 / portTICK_PERIOD_MS);
     }
 }
